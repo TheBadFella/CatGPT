@@ -18,6 +18,6 @@ Pillow>=11.2.1
 PyMuPDF>=1.26.0
 
 # OpenAI-compatible testing
-openai>=2.32.0
+openai>=2.36.0
 langchain-openai>=1.2.1
 langchain>=1.2.15
