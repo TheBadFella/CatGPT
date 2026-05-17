@@ -253,32 +253,28 @@ class ChatGPTClient:
         """
         text = await self._page.evaluate("""
             (previousSignature) => {
-                const articles = document.querySelectorAll('article');
-                if (articles.length === 0) return '';
-
-                const isAssistantArticle = (article) => {
-                    const hasAssistantRole = article.querySelector('[data-message-author-role="assistant"]');
-                    const hasAgentTurn = article.querySelector('.agent-turn');
-                    const hasGeneratedImage = article.querySelector('img[alt="Generated image"], div[id^="image-"]');
-                    return Boolean(hasAssistantRole || hasAgentTurn || hasGeneratedImage);
-                };
+                const turns = document.querySelectorAll('section[data-testid^="conversation-turn-"]');
+                if (turns.length === 0) return '';
 
                 let last = null;
-                for (let idx = articles.length - 1; idx >= 0; idx--) {
-                    const article = articles[idx];
-                    if (!isAssistantArticle(article)) continue;
+                for (let idx = turns.length - 1; idx >= 0; idx--) {
+                    const turn = turns[idx];
+                    const turnRole = turn.getAttribute('data-turn');
+                    const hasAssistantRole = turnRole === 'assistant' ||
+                        Boolean(turn.querySelector('[data-message-author-role="assistant"]'));
+                    if (!hasAssistantRole) continue;
 
                     const stableId =
-                        article.getAttribute('data-message-id') ||
-                        article.getAttribute('data-testid') ||
-                        article.id ||
+                        turn.getAttribute('data-turn-id') ||
+                        turn.getAttribute('data-testid') ||
+                        turn.id ||
                         '';
                     const signature = `${idx}:${stableId}`;
                     if (previousSignature && signature === previousSignature) {
                         return '';
                     }
 
-                    last = article;
+                    last = turn;
                     break;
                 }
 

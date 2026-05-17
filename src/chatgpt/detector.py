@@ -25,6 +25,7 @@ def normalize_assistant_text(text: str | None) -> str:
     """Normalize extracted assistant text for validation and comparisons."""
     cleaned = (text or "").strip()
     cleaned = re.sub(r"^ChatGPT said:\s*", "", cleaned, flags=re.IGNORECASE).strip()
+    cleaned = re.sub(r"^You said:\s*", "", cleaned, flags=re.IGNORECASE).strip()
     return cleaned
 
 
@@ -78,34 +79,30 @@ async def _latest_assistant_turn_snapshot(page: Page) -> dict:
     snapshot = await page.evaluate(
         """
         () => {
-            const articles = Array.from(document.querySelectorAll('article'));
+            const turns = Array.from(document.querySelectorAll('section[data-testid^="conversation-turn-"]'));
 
-            const isAssistantArticle = (article) => {
-                const hasAssistantRole = article.querySelector('[data-message-author-role="assistant"]');
-                const hasAgentTurn = article.querySelector('.agent-turn');
-                const hasGeneratedImage = article.querySelector('img[alt="Generated image"], div[id^="image-"]');
-                return Boolean(hasAssistantRole || hasAgentTurn || hasGeneratedImage);
-            };
-
-            for (let idx = articles.length - 1; idx >= 0; idx--) {
-                const article = articles[idx];
-                if (!isAssistantArticle(article)) continue;
+            for (let idx = turns.length - 1; idx >= 0; idx--) {
+                const turn = turns[idx];
+                const turnRole = turn.getAttribute('data-turn');
+                const hasAssistantRole = turnRole === 'assistant' ||
+                    Boolean(turn.querySelector('[data-message-author-role="assistant"]'));
+                if (!hasAssistantRole) continue;
 
                 const stableId =
-                    article.getAttribute('data-message-id') ||
-                    article.getAttribute('data-testid') ||
-                    article.id ||
+                    turn.getAttribute('data-turn-id') ||
+                    turn.getAttribute('data-testid') ||
+                    turn.id ||
                     '';
 
                 const hasCopyButton = Boolean(
-                    article.querySelector('button[data-testid="copy-turn-action-button"], button[aria-label="Copy"]')
+                    turn.querySelector('button[data-testid="copy-turn-action-button"], button[aria-label="Copy message"], button[aria-label="Copy"]')
                 );
 
                 const hasImage = Boolean(
-                    article.querySelector('img[alt="Generated image"], div[id^="image-"] img, div[id^="image-"]')
+                    turn.querySelector('img[alt="Generated image"], div[id^="image-"] img, div[id^="image-"]')
                 );
 
-                const text = (article.innerText || '').trim();
+                const text = (turn.innerText || '').trim();
 
                 return {
                     found: true,
@@ -149,18 +146,14 @@ async def count_assistant_messages(page: Page) -> int:
     count = await page.evaluate(
         """
         () => {
-            const articles = Array.from(document.querySelectorAll('article'));
-
-            const isAssistantArticle = (article) => {
-                const hasAssistantRole = article.querySelector('[data-message-author-role="assistant"]');
-                const hasAgentTurn = article.querySelector('.agent-turn');
-                const hasGeneratedImage = article.querySelector('img[alt="Generated image"], div[id^="image-"]');
-                return Boolean(hasAssistantRole || hasAgentTurn || hasGeneratedImage);
-            };
+            const turns = Array.from(document.querySelectorAll('section[data-testid^="conversation-turn-"]'));
 
             let total = 0;
-            for (const article of articles) {
-                if (isAssistantArticle(article)) total++;
+            for (const turn of turns) {
+                const turnRole = turn.getAttribute('data-turn');
+                const hasAssistantRole = turnRole === 'assistant' ||
+                    Boolean(turn.querySelector('[data-message-author-role="assistant"]'));
+                if (hasAssistantRole) total++;
             }
             return total;
         }
@@ -184,20 +177,16 @@ async def _count_copy_buttons(page: Page) -> int:
     count = await page.evaluate(
         """
         () => {
-            const articles = Array.from(document.querySelectorAll('article'));
-
-            const isAssistantArticle = (article) => {
-                const hasAssistantRole = article.querySelector('[data-message-author-role="assistant"]');
-                const hasAgentTurn = article.querySelector('.agent-turn');
-                const hasGeneratedImage = article.querySelector('img[alt="Generated image"], div[id^="image-"]');
-                return Boolean(hasAssistantRole || hasAgentTurn || hasGeneratedImage);
-            };
+            const turns = Array.from(document.querySelectorAll('section[data-testid^="conversation-turn-"]'));
 
             let total = 0;
-            for (const article of articles) {
-                if (!isAssistantArticle(article)) continue;
-                const hasCopyButton = article.querySelector(
-                    'button[data-testid="copy-turn-action-button"], button[aria-label="Copy"]'
+            for (const turn of turns) {
+                const turnRole = turn.getAttribute('data-turn');
+                const hasAssistantRole = turnRole === 'assistant' ||
+                    Boolean(turn.querySelector('[data-message-author-role="assistant"]'));
+                if (!hasAssistantRole) continue;
+                const hasCopyButton = turn.querySelector(
+                    'button[data-testid="copy-turn-action-button"], button[aria-label="Copy message"], button[aria-label="Copy"]'
                 );
                 if (hasCopyButton) total++;
             }
@@ -443,23 +432,19 @@ async def extract_last_response_via_copy(
         click_result = await page.evaluate(
             """
             (previousSignature) => {
-                const articles = Array.from(document.querySelectorAll('article'));
+                const turns = Array.from(document.querySelectorAll('section[data-testid^="conversation-turn-"]'));
 
-                const isAssistantArticle = (article) => {
-                    const hasAssistantRole = article.querySelector('[data-message-author-role="assistant"]');
-                    const hasAgentTurn = article.querySelector('.agent-turn');
-                    const hasGeneratedImage = article.querySelector('img[alt="Generated image"], div[id^="image-"]');
-                    return Boolean(hasAssistantRole || hasAgentTurn || hasGeneratedImage);
-                };
-
-                for (let idx = articles.length - 1; idx >= 0; idx--) {
-                    const article = articles[idx];
-                    if (!isAssistantArticle(article)) continue;
+                for (let idx = turns.length - 1; idx >= 0; idx--) {
+                    const turn = turns[idx];
+                    const turnRole = turn.getAttribute('data-turn');
+                    const hasAssistantRole = turnRole === 'assistant' ||
+                        Boolean(turn.querySelector('[data-message-author-role="assistant"]'));
+                    if (!hasAssistantRole) continue;
 
                     const stableId =
-                        article.getAttribute('data-message-id') ||
-                        article.getAttribute('data-testid') ||
-                        article.id ||
+                        turn.getAttribute('data-turn-id') ||
+                        turn.getAttribute('data-testid') ||
+                        turn.id ||
                         '';
                     const signature = `${idx}:${stableId}`;
 
@@ -467,8 +452,8 @@ async def extract_last_response_via_copy(
                         return { clicked: false, reason: 'stale-turn', signature };
                     }
 
-                    const btn = article.querySelector(
-                        'button[data-testid="copy-turn-action-button"], button[aria-label="Copy"]'
+                    const btn = turn.querySelector(
+                        'button[data-testid="copy-turn-action-button"], button[aria-label="Copy message"], button[aria-label="Copy"]'
                     );
                     if (!btn) {
                         return { clicked: false, reason: 'no-copy-button', signature };
@@ -513,23 +498,19 @@ async def _extract_via_dom(
     text = await page.evaluate(
         """
         (previousSignature) => {
-            const articles = Array.from(document.querySelectorAll('article'));
+            const turns = Array.from(document.querySelectorAll('section[data-testid^="conversation-turn-"]'));
 
-            const isAssistantArticle = (article) => {
-                const hasAssistantRole = article.querySelector('[data-message-author-role="assistant"]');
-                const hasAgentTurn = article.querySelector('.agent-turn');
-                const hasGeneratedImage = article.querySelector('img[alt="Generated image"], div[id^="image-"]');
-                return Boolean(hasAssistantRole || hasAgentTurn || hasGeneratedImage);
-            };
-
-            for (let idx = articles.length - 1; idx >= 0; idx--) {
-                const article = articles[idx];
-                if (!isAssistantArticle(article)) continue;
+            for (let idx = turns.length - 1; idx >= 0; idx--) {
+                const turn = turns[idx];
+                const turnRole = turn.getAttribute('data-turn');
+                const hasAssistantRole = turnRole === 'assistant' ||
+                    Boolean(turn.querySelector('[data-message-author-role="assistant"]'));
+                if (!hasAssistantRole) continue;
 
                 const stableId =
-                    article.getAttribute('data-message-id') ||
-                    article.getAttribute('data-testid') ||
-                    article.id ||
+                    turn.getAttribute('data-turn-id') ||
+                    turn.getAttribute('data-testid') ||
+                    turn.id ||
                     '';
                 const signature = `${idx}:${stableId}`;
 
@@ -537,7 +518,7 @@ async def _extract_via_dom(
                     return '';
                 }
 
-                return (article.innerText || '').trim();
+                return (turn.innerText || '').trim();
             }
 
             return '';
