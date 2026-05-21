@@ -17,7 +17,7 @@ from patchright.async_api import Page
 
 from src.config import Config
 from src.claude.selectors import ClaudeSelectors
-from src.browser.human import human_type, human_click, thinking_pause, random_delay
+from src.browser.human import human_type, human_click, random_delay
 from src.claude.detector import (
     wait_for_response_complete,
     extract_last_response_via_copy,
