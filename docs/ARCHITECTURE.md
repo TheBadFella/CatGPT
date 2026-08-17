@@ -262,12 +262,12 @@ Docker Container (jlesage/baseimage-gui:debian-12)
 |-- Web GUI (:5800)      HTML5 web access with sidebar, clipboard sync & settings
 +-- FastAPI (:8000)      API server (launched via /startapp.sh)
 |
-+-- Initialization managed by /etc/cont-init.d/10-catgpt-init.sh
++-- Initialization managed by /etc/cont-init.d/50-catgpt-init.sh
 ```
 
 ### Startup Sequence
 
-1. `10-catgpt-init.sh` (cont-init):
+1. `50-catgpt-init.sh` (cont-init, after jlesage user initialization):
    - Prepare runtime directories
    - Clean stale Chrome lock files
    - Pre-resolve DNS domains via Python, write to `/etc/hosts`

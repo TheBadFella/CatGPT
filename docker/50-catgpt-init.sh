@@ -6,10 +6,11 @@ set -e
 echo "[catgpt-init] Preparing runtime directories..."
 mkdir -p /app/browser_data /app/logs /app/downloads/images /app/downloads/audio
 
-# Ensure app user owns data directories
-if [ -n "$USER_ID" ] && [ -n "$GROUP_ID" ]; then
-    chown -R "$USER_ID:$GROUP_ID" /app/browser_data /app/logs /app/downloads 2>/dev/null || true
-fi
+# This script runs after jlesage initializes USER_ID/GROUP_ID and the app user.
+# Use the base-image helper so bind mounts and network shares are handled safely.
+take-ownership /app/browser_data
+take-ownership /app/logs
+take-ownership /app/downloads
 
 # Clean up stale Chromium locks from previous crash/restart
 rm -f /app/browser_data/SingletonLock \

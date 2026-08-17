@@ -2,6 +2,9 @@ services:
   # CatGPT Gateway - Enhanced Container Mock for Chat Apps
   catgpt:
     image: ghcr.io/thebadfella/catgpt:latest
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
     container_name: catgpt
     security_opt:
       - seccomp=unconfined
@@ -16,8 +19,7 @@ services:
       - app_services
     ports:
       - "8650:8000" # API Port
-      - "5800:5800" # jlesage Web GUI (HTTP)
-      # - "5801:5801" # jlesage Web GUI (HTTPS - enable if SECURE_CONNECTION=1)
+      - "5800:5800" # jlesage Web GUI (HTTP, or HTTPS with SECURE_CONNECTION=1)
       # - "5900:5900" # Direct VNC port (optional)
     tmpfs:
       - /tmp:exec,mode=1777
@@ -28,6 +30,8 @@ services:
       APP_NAME: "CatGPT"
       SECURE_CONNECTION: "0"
       KEEP_APP_RUNNING: "1"
+      USER_ID: ${CATGPT_USER_ID:-1000}
+      GROUP_ID: ${CATGPT_GROUP_ID:-1000}
       DISPLAY_WIDTH: 1366
       DISPLAY_HEIGHT: 768
       # Browser (headed on virtual display)
@@ -55,7 +59,7 @@ services:
       # API
       API_HOST: "0.0.0.0"
       API_PORT: 8000
-      API_TOKEN: ${CATGPT_API_KEY}
+      API_TOKEN: ${CATGPT_API_KEY:-dummy123}
       API_TOKEN_OPTIONAL: "true"
       # Optional: keep large system instructions in thread context and send compact reminders
       API_THREAD_CONTRACT_MODE: "true"
@@ -67,13 +71,14 @@ services:
       API_HEADER_ROW_MERGE_MODE: "true"
       API_APP_THREAD_DELETE_EXPIRED: "true"
       # VNC Authentication
-      VNC_PASSWORD: ${CATGPT_VNC_PASSWORD}
+      VNC_PASSWORD: ${CATGPT_VNC_PASSWORD:-catgpt}
       # Logging (verbose for Docker)
       LOG_LEVEL: "DEBUG"
       VERBOSE: "true"
     volumes:
-      - ${DOCKERDIR}/appdata/catgpt/browser:/app/browser_data
-      - ${DOCKERDIR}/appdata/catgpt/logs:/app/logs
+      - ${DOCKERDIR:-.}/appdata/catgpt/config:/config
+      - ${DOCKERDIR:-.}/appdata/catgpt/browser:/app/browser_data
+      - ${DOCKERDIR:-.}/appdata/catgpt/logs:/app/logs
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
       interval: 30s
