@@ -9,41 +9,15 @@ ENV APP_NAME="CatGPT"
 ENV KEEP_APP_RUNNING=1
 
 # ── System dependencies ─────────────────────────────────────────
-# Install Python 3, venv, development tools, fonts, and Chromium runtime deps
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install Python 3, venv, and base tools via jlesage add-pkg helper
+RUN add-pkg \
     python3 \
     python3-pip \
     python3-venv \
     python3-dev \
-    # Chrome runtime dependencies
-    libglib2.0-0 \
-    libnss3 \
-    libnspr4 \
-    libdbus-1-3 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libcups2 \
-    libdrm2 \
-    libxkbcommon0 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxfixes3 \
-    libxrandr2 \
-    libgbm1 \
-    libpango-1.0-0 \
-    libcairo2 \
-    libasound2 \
-    libatspi2.0-0 \
-    libwayland-client0 \
-    # Fonts for page rendering
-    fonts-liberation \
-    fonts-noto-color-emoji \
-    fonts-dejavu-core \
-    # Utilities
     curl \
     procps \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+    ca-certificates
 
 # ── Python Virtual Environment ──────────────────────────────────
 ENV VIRTUAL_ENV=/opt/venv
@@ -57,7 +31,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install patchright's Chromium browser and runtime dependencies
+# Install patchright's Chromium browser and its system runtime dependencies
 RUN patchright install chromium && patchright install-deps chromium
 
 # Copy application source code and scripts
