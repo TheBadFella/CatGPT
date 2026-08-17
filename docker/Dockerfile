@@ -8,6 +8,9 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV APP_NAME="CatGPT"
 ENV KEEP_APP_RUNNING=1
 
+# Ensure the Debian 'staff' group exists (required by fontconfig-config postinst)
+RUN groupadd -r staff 2>/dev/null || true
+
 # ── System dependencies ─────────────────────────────────────────
 # Install Python 3, venv, and base tools via jlesage add-pkg helper
 RUN add-pkg \
