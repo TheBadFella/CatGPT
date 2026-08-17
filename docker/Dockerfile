@@ -1,5 +1,5 @@
 # ── Stage 1: Build CatGPT with jlesage/baseimage-gui ────────────
-FROM jlesage/baseimage-gui:debian-12
+FROM jlesage/baseimage-gui:debian-12-v4
 
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
