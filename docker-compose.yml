@@ -16,20 +16,23 @@ services:
       - app_services
     ports:
       - "8650:8000" # API Port
-      - "6080:6080" # noVNC web UI
-    command: ["/entrypoint.sh"]
+      - "5800:5800" # jlesage Web GUI (HTTP)
+      # - "5801:5801" # jlesage Web GUI (HTTPS - enable if SECURE_CONNECTION=1)
+      # - "5900:5900" # Direct VNC port (optional)
     tmpfs:
       - /tmp:exec,mode=1777
       - /app/browser_data/Default/Cache:mode=1777
       - /app/browser_data/Default/Code Cache:mode=1777
     environment:
+      # Application GUI (jlesage)
+      APP_NAME: "CatGPT"
+      SECURE_CONNECTION: "0"
+      KEEP_APP_RUNNING: "1"
+      DISPLAY_WIDTH: 1366
+      DISPLAY_HEIGHT: 768
       # Browser (headed on virtual display)
       HEADLESS: "false"
       SLOW_MO: 50
-      DISPLAY: ":99"
-      DISPLAY_WIDTH: 1366
-      DISPLAY_HEIGHT: 768
-      DISPLAY_DEPTH: 24
       # Provider: "chatgpt", "claude", or "minimax"
       PROVIDER: ${PROVIDER:-chatgpt}
       # ChatGPT

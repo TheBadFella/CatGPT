@@ -1,24 +1,20 @@
-# ── Stage 1: Build ──────────────────────────────────────────────
-FROM python:3.14-slim AS base
+# ── Stage 1: Build CatGPT with jlesage/baseimage-gui ────────────
+FROM jlesage/baseimage-gui:debian-12
 
-# Prevent interactive prompts during apt-get
+# Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Application settings for jlesage GUI
+ENV APP_NAME="CatGPT"
+ENV KEEP_APP_RUNNING=1
+
 # ── System dependencies ─────────────────────────────────────────
-# Xvfb: virtual framebuffer (fake display for headed Chrome)
-# x11vnc: VNC server to capture Xvfb display
-# noVNC + websockify: browser-based VNC client
-# Chrome deps: fonts, media, GL, sandbox support
-# supervisor: process manager
+# Install Python 3, venv, development tools, fonts, and Chromium runtime deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    # Virtual display
-    xvfb \
-    # VNC
-    x11vnc \
-    # noVNC (browser-based VNC)
-    novnc websockify \
-    # Process manager
-    supervisor \
+    python3 \
+    python3-pip \
+    python3-venv \
+    python3-dev \
     # Chrome runtime dependencies
     libglib2.0-0 \
     libnss3 \
@@ -39,14 +35,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libasound2 \
     libatspi2.0-0 \
     libwayland-client0 \
-    # Fonts (so pages render properly)
+    # Fonts for page rendering
     fonts-liberation \
     fonts-noto-color-emoji \
     fonts-dejavu-core \
     # Utilities
     curl \
     procps \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
+# ── Python Virtual Environment ──────────────────────────────────
+ENV VIRTUAL_ENV=/opt/venv
+RUN python3 -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 # ── Application setup ───────────────────────────────────────────
 WORKDIR /app
@@ -55,30 +57,22 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install patchright's Chromium browser
+# Install patchright's Chromium browser and runtime dependencies
 RUN patchright install chromium && patchright install-deps chromium
 
-# Copy application code
+# Copy application source code and scripts
 COPY src/ src/
 COPY scripts/ scripts/
 
 # ── Directory setup ─────────────────────────────────────────────
-# These will be overridden by volume mounts in docker-compose
 RUN mkdir -p /app/browser_data /app/logs /app/downloads/images /app/downloads/audio
 
-# ── Supervisor & entrypoint ─────────────────────────────────────
-COPY docker/supervisord.conf /etc/supervisor/conf.d/catgpt.conf
-COPY docker/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+# ── GUI initialization & startup scripts ────────────────────────
+COPY docker/10-catgpt-init.sh /etc/cont-init.d/10-catgpt-init.sh
+COPY docker/startapp.sh /startapp.sh
+RUN chmod +x /etc/cont-init.d/10-catgpt-init.sh /startapp.sh
 
-# ── Environment ─────────────────────────────────────────────────
-# Virtual display
-ENV DISPLAY=:99
-ENV DISPLAY_WIDTH=1280
-ENV DISPLAY_HEIGHT=720
-ENV DISPLAY_DEPTH=24
-
-# App config (overridable via docker-compose)
+# ── App Environment Variables ───────────────────────────────────
 ENV HEADLESS=false
 ENV BROWSER_DATA_DIR=/app/browser_data
 ENV LOG_DIR=/app/logs
@@ -86,14 +80,17 @@ ENV API_HOST=0.0.0.0
 ENV API_PORT=8000
 ENV LOG_LEVEL=DEBUG
 ENV VERBOSE=true
+ENV PYTHONPATH=/app
+ENV DISPLAY_WIDTH=1366
+ENV DISPLAY_HEIGHT=768
 
 # ── Ports ───────────────────────────────────────────────────────
 # 8000: FastAPI server
-# 6080: noVNC web UI
-EXPOSE 8000 6080
+# 5800: Web GUI (HTTP)
+# 5801: Web GUI (HTTPS)
+# 5900: VNC
+EXPOSE 8000 5800 5801 5900
 
 # ── Health check ────────────────────────────────────────────────
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8000/v1/models || exit 1
-
-ENTRYPOINT ["/entrypoint.sh"]
+    CMD curl -f http://localhost:8000/healthz || curl -f http://localhost:8000/v1/models || exit 1

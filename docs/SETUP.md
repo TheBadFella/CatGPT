@@ -228,23 +228,24 @@ Default: `catgpt`. Change it via `VNC_PASSWORD` in `.env` or `docker-compose.yml
 
 ## Docker Internals
 
-### Container Services (managed by supervisord)
+### Container Services (managed by jlesage/baseimage-gui)
 
 | Service | Port | Purpose |
 |---|---|---|
-| Xvfb | `:99` | Virtual framebuffer. Chrome renders here. |
-| x11vnc | `5900` | VNC server capturing the Xvfb display |
-| noVNC | `6080` | WebSocket bridge. Browser-accessible VNC viewer. |
+| Web GUI (HTTP) | `5800` | Browser-accessible GUI (TigerVNC + Openbox + HTML5 web client) |
+| Web GUI (HTTPS) | `5801` | Secure browser-accessible GUI (if `SECURE_CONNECTION=1`) |
+| Direct VNC | `5900` | Direct VNC client access (optional) |
 | FastAPI | `8000` | API server (OpenAI-compatible + custom REST) |
 
 ### Startup Sequence
 
-1. Create directories (`browser_data`, `logs`, `downloads/images`, `downloads/audio`)
-2. Clean stale Chrome lock files
-3. Set up VNC password
-4. Pre-resolve DNS domains and write to `/etc/hosts` (Docker DNS workaround)
-5. Verify Xvfb and Patchright Chromium
-6. Start supervisord (manages all 4 services)
+1. `10-catgpt-init.sh` runs as root:
+   - Create and verify directories (`browser_data`, `logs`, `downloads/images`, `downloads/audio`)
+   - Clean stale Chrome lock files
+   - Pre-resolve DNS domains and write to `/etc/hosts` (Docker DNS workaround)
+2. `jlesage/baseimage-gui` initializes X server, Openbox window manager, TigerVNC, and the web GUI
+3. `/startapp.sh` launches `python3 -m src.api.server`
+4. FastAPI server starts Patchright Chromium in the active graphical display
 
 ### Volumes
 
